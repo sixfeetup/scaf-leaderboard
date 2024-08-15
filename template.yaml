@@ -1,0 +1,54 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Transform: AWS::Serverless-2016-10-31
+
+Resources:
+  SessionsTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      TableName: Sessions
+      AttributeDefinitions:
+        - AttributeName: sessionid
+          AttributeType: S
+      KeySchema:
+        - AttributeName: sessionid
+          KeyType: HASH
+      BillingMode: PAY_PER_REQUEST
+
+  ReportFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      Handler: app.lambda_handler
+      Runtime: python3.12
+      CodeUri: ./src
+      Timeout: 10  # Increase timeout to 10 seconds
+      Environment:
+        Variables:
+          SESSIONS_TABLE: !Ref SessionsTable
+      Policies:
+        - DynamoDBCrudPolicy:
+            TableName: !Ref SessionsTable
+      Events:
+        Report:
+          Type: Api
+          Properties:
+            Path: /report
+            Method: post
+
+  LeaderboardFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      Handler: app.lambda_handler
+      Runtime: python3.12
+      CodeUri: ./src
+      Environment:
+        Variables:
+          SESSIONS_TABLE: !Ref SessionsTable
+      Policies:
+        - DynamoDBCrudPolicy:
+            TableName: !Ref SessionsTable
+      Events:
+        Leaderboard:
+          Type: Api
+          Properties:
+            Path: /leaderboard
+            Method: get

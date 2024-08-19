@@ -1,0 +1,101 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>API Tester</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 20px;
+        }
+        form {
+            margin-bottom: 20px;
+        }
+        input, button {
+            display: block;
+            margin: 10px 0;
+            padding: 10px;
+            width: 300px;
+        }
+        pre {
+            background-color: #f4f4f4;
+            padding: 10px;
+            border: 1px solid #ddd;
+            max-width: 600px;
+        }
+    </style>
+</head>
+<body>
+    <h1>API Tester</h1>
+
+    <form id="reportForm">
+        <h2>Send Report Request</h2>
+        <label for="authorization">Authorization Header:</label>
+        <input type="text" id="authorization" name="authorization" placeholder="Bearer your_token_here" required>
+
+        <label for="sessionid">Session ID:</label>
+        <input type="text" id="sessionid" name="sessionid" required>
+
+        <label for="start">Start Time:</label>
+        <input type="datetime-local" id="start" name="start">
+
+        <label for="end">End Time:</label>
+        <input type="datetime-local" id="end" name="end">
+
+        <button type="button" onclick="sendReportRequest()">Send Report Request</button>
+    </form>
+
+    <form id="leaderboardForm">
+        <h2>Get Leaderboard</h2>
+        <!-- Removed authorization input for leaderboard as it's not needed -->
+        <button type="button" onclick="getLeaderboard()">Get Leaderboard</button>
+    </form>
+
+    <pre id="response"></pre>
+
+    <script>
+        async function sendReportRequest() {
+            const responseArea = document.getElementById('response');
+            const authorization = document.getElementById('authorization').value;
+            const sessionid = document.getElementById('sessionid').value;
+            const start = document.getElementById('start').value;
+            const end = document.getElementById('end').value;
+
+            // Convert datetime-local to simplified ISO 8601 format without milliseconds and timezone
+            const startIso = start ? new Date(start).toISOString().split('.')[0] + 'Z' : '';
+            const endIso = end ? new Date(end).toISOString().split('.')[0] + 'Z' : '';
+
+            try {
+                const response = await fetch('/report', {
+                    method: 'POST',
+                    headers: {
+                        'Authorization': authorization,
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ sessionid, start: startIso, end: endIso })
+                });
+                const data = await response.json();
+                responseArea.textContent = JSON.stringify(data, null, 2);
+            } catch (error) {
+                responseArea.textContent = 'Error: ' + error.message;
+            }
+        }
+
+        async function getLeaderboard() {
+            const responseArea = document.getElementById('response');
+
+            try {
+                const response = await fetch('/leaderboard', {
+                    method: 'GET'
+                });
+                const data = await response.json();
+                responseArea.textContent = JSON.stringify(data, null, 2);
+            } catch (error) {
+                responseArea.textContent = 'Error: ' + error.message;
+            }
+        }
+    </script>
+
+</body>
+</html>

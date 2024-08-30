@@ -6,7 +6,7 @@
     "DYNAMODB_ENDPOINT": "http://host.docker.internal:8000"
   },
   "PassageAuthFunction": {
-      "PASSAGE_APP_ID": "961JRDH4c4Sin8LYGGbI0Lb7",
-      "PASSAGE_API_KEY": "eKsELehsQz.4KjQmGH7OIthB0z3EiIzg1wgix6KRdISXZSDftg8pd9gFZFhwH1FU7jrXUBZnyNB"
+      "PASSAGE_APP_ID": "CHANGEME",
+      "PASSAGE_API_KEY": "CHANGEME"
   }
 }

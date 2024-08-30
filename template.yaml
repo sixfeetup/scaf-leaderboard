@@ -1,14 +1,56 @@
 AWSTemplateFormatVersion: '2010-09-09'
 Transform: 'AWS::Serverless-2016-10-31'
-Description: A simple Flask application
+Description: SAM Serverless App to Track scaf runtime and produce a leaderboard.
 
 Resources:
-  FlaskFunction:
+  LeaderboardApi:
+    Type: AWS::Serverless::Api
+    Properties:
+      StageName: Prod
+      Auth:
+        DefaultAuthorizer: PassageTokenAuthorizer
+        Authorizers:
+          PassageTokenAuthorizer:
+            FunctionArn: !GetAtt PassageAuthFunction.Arn
+  PassageAuthFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: ./src
+      Handler: authorizer.handler
+      Runtime: python3.12
+      Timeout: 10
+      Environment:
+        Variables:
+          PASSAGE_APP_ID: dummy
+          PASSAGE_API_KEY: dummy
+  ReportFunction:
     Type: 'AWS::Serverless::Function'
     Properties:
-      Handler: app.lambda_handler
-      Runtime: python3.8
-      CodeUri: .
+      Handler: app.report
+      Runtime: python3.12
+      CodeUri: ./src
+      MemorySize: 128
+      Timeout: 10
+      Policies:
+        - DynamoDBCrudPolicy:
+            TableName: !Ref Sessions
+      Environment:
+        Variables:
+          SESSIONS_TABLE: !Ref Sessions
+          DYNAMODB_ENDPOINT: !Ref DynamoDbEndpoint
+      Events:
+        Api:
+          Type: Api
+          Properties:
+            RestApiId: !Ref LeaderboardApi
+            Path: /report
+            Method: post
+  LeaderboardFunction:
+    Type: 'AWS::Serverless::Function'
+    Properties:
+      Handler: app.leaderboard
+      Runtime: python3.12
+      CodeUri: ./src
       MemorySize: 128
       Timeout: 10
       Policies:
@@ -16,18 +58,38 @@ Resources:
         - AWSLambdaDynamoDBExecutionRole
       Environment:
         Variables:
-          SESSIONS_TABLE: !Ref SessionsTable
+          SESSIONS_TABLE: !Ref Sessions
+          DYNAMODB_ENDPOINT: !Ref DynamoDbEndpoint
+      Events:
+        Api:
+          Type: Api
+          Properties:
+            Path: /leaderboard
+            Method: get
 
-  SessionsTable:
-    Type: 'AWS::DynamoDB::Table'
+  Sessions:
+    Type: AWS::DynamoDB::Table
     Properties:
       TableName: Sessions
       AttributeDefinitions:
         - AttributeName: sessionid
           AttributeType: S
+        - AttributeName: email
+          AttributeType: S
+        - AttributeName: user_name
+          AttributeType: S
+        - AttributeName: start
+          AttributeType: N
+        - AttributeName: end
+          AttributeType: N
       KeySchema:
         - AttributeName: sessionid
           KeyType: HASH
       ProvisionedThroughput:
         ReadCapacityUnits: 5
         WriteCapacityUnits: 5
+
+Parameters:
+  DynamoDbEndpoint:
+    Type: String
+    Default: "https://dynamodb.us-east-1.amazonaws.com"

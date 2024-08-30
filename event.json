@@ -1,6 +1,6 @@
 {
     "headers": {
-        "Authorization": "Bearer vW4sfq96X7gJHtpzFmYVgzXm"
+        "Authorization": "Bearer CHANGEME"
     },
     "httpMethod": "POST",
     "path": "/report",

@@ -1,12 +1,12 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <project version="4">
   <component name="accountSettings">
-    <option name="activeProfile" value="profile:scaf-admin" />
+    <option name="activeProfile" value="profile:sixfeetup-060795910716-admin" />
     <option name="activeRegion" value="us-east-1" />
     <option name="recentlyUsedProfiles">
       <list>
-        <option value="profile:scaf-admin" />
         <option value="profile:sixfeetup-060795910716-admin" />
+        <option value="profile:scaf-admin" />
       </list>
     </option>
     <option name="recentlyUsedRegions">
@@ -16,9 +16,9 @@
     </option>
   </component>
   <component name="connectionManager">
-    <option name="activeConnectionId" value="sso-session:scaf" />
+    <option name="activeConnectionId" value="AwsConnectionManagerConnection" />
   </component>
   <component name="explorerToolWindow">
-    <option name="selectedTab" value="Amazon Q" />
+    <option name="selectedTab" value="Explorer" />
   </component>
 </project>

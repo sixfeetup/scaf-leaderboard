@@ -2,7 +2,7 @@
   "ReportFunction": {
     "DYNAMODB_ENDPOINT": "http://host.docker.internal:8000"
   },
-  "LeaderBoardFunction": {
+  "LeaderboardFunction": {
     "DYNAMODB_ENDPOINT": "http://host.docker.internal:8000"
   },
   "PassageAuthFunction": {

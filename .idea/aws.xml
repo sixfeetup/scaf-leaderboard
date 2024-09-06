@@ -16,7 +16,7 @@
     </option>
   </component>
   <component name="connectionManager">
-    <option name="activeConnectionId" value="AwsConnectionManagerConnection" />
+    <option name="activeConnectionId" value="sso-session:sixfeetup" />
   </component>
   <component name="explorerToolWindow">
     <option name="selectedTab" value="Explorer" />

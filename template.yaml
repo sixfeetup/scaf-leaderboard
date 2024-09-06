@@ -39,12 +39,12 @@ Resources:
           SESSIONS_TABLE: !Ref Sessions
           DYNAMODB_ENDPOINT: !Ref DynamoDbEndpoint
       Events:
-        Api:
+        AuthenticatedApi:
           Type: Api
           Properties:
-            RestApiId: !Ref LeaderboardApi
             Path: /report
             Method: post
+            RestApiId: !Ref LeaderboardApi
   LeaderboardFunction:
     Type: AWS::Serverless::Function
     Properties:
@@ -61,11 +61,14 @@ Resources:
           SESSIONS_TABLE: !Ref Sessions
           DYNAMODB_ENDPOINT: !Ref DynamoDbEndpoint
       Events:
-        Api:
+        PublicApi:
           Type: Api
           Properties:
             Path: /leaderboard
             Method: get
+            RestApiId: !Ref LeaderboardApi
+            Auth:
+              Authorizer: NONE
   Sessions:
     Type: AWS::DynamoDB::Table
     Properties:
@@ -104,4 +107,11 @@ Resources:
 Parameters:
   DynamoDbEndpoint:
     Type: String
-    Default: "https://dynamodb.us-east-1.amazonaws.com"
+
+Outputs:
+  LeaderboardApiUrl:
+    Description: "API Gateway endpoint URL"
+    Value: !Sub "https://${LeaderboardApi}.execute-api.${AWS::Region}.amazonaws.com/Prod/"
+  TableName:
+    Description: DynamoDB Table Name
+    Value: !Ref Sessions

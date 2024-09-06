@@ -1,16 +1,38 @@
+import time
+from decimal import Decimal
+
 import boto3
 import json
 import os
 from datetime import datetime
 from aws_lambda_powertools import Logger
 from aws_lambda_powertools.utilities.typing import LambdaContext
+from boto3.dynamodb.conditions import Key
 
 logger = Logger()
 
 
+def validate_time(timestamp_str):
+    try:
+        # Convert the timestamp string to a float
+        timestamp = float(timestamp_str)
+
+        # Get the current time
+        current_time = time.time()
+
+        # Calculate the difference in seconds
+        time_difference = current_time - timestamp
+
+        # Check if the difference is within 5 minutes (300 seconds)
+        return 0 <= time_difference <= 300
+    except ValueError:
+        # Return False if the input can't be converted to a float
+        return False
+
+
 def report(event: dict, context: LambdaContext) -> dict:
     """ Report timings """
-    logger.info("Lambda function invoked", extra={"event": event})
+    logger.debug("Lambda function invoked", extra={"event": event})
 
     body = json.loads(event.get('body'))
     sessionid = body.get('sessionid')
@@ -25,28 +47,54 @@ def report(event: dict, context: LambdaContext) -> dict:
     table = dynamodb.Table(os.getenv('SESSIONS_TABLE', 'Sessions'))
 
     if start:
-        start_timestamp = parse_datetime(start)
-        table.update_item(
-            Key={'sessionid': sessionid},
-            UpdateExpression="SET #s = :s, email = :e, user_name = :u",
-            ExpressionAttributeNames={"#s": "start"},
-            ExpressionAttributeValues={
-                ":s": start_timestamp,
-                ":e": user_email,
-                ":u": user_name
+        if not validate_time(start):
+            return {"statusCode": 500, "body": json.dumps({"error": "Invalid start time"})}
+        table.put_item(
+            Item={
+                'user_name': user_name,
+                'sessionid': sessionid,
+                'email': user_email,
+                'start': start,
+                'status': 'IN_PROGRESS',
             }
         )
 
     if end:
-        end_timestamp = parse_datetime(end)
+        if not validate_time(end):
+            return {"statusCode": 500, "body": json.dumps({"error": "Invalid end time"})}
+        response = table.get_item(
+            Key={
+                'user_name': user_name,
+                'sessionid': sessionid
+            },
+            ProjectionExpression='#start_time',  # Use an expression attribute name
+            ExpressionAttributeNames={
+                '#start_time': 'start'  # Map the expression attribute name to the actual attribute name
+            }
+        )
+        if 'Item' in response:
+            start = response['Item'].get('start')
+        else:
+            print(f"No session found for user {user_name} with sessionid {sessionid}")
+            return {"statusCode": 500, "body": json.dumps({"error": "No session found"})}
+
+        duration = Decimal(end) - Decimal(start)
         table.update_item(
-            Key={'sessionid': sessionid},
-            UpdateExpression="SET #e = :e",
-            ExpressionAttributeNames={"#e": "end"},
-            ExpressionAttributeValues={":e": end_timestamp}
+            Key={'user_name': user_name, 'sessionid': sessionid},
+            UpdateExpression="SET #end = :end, #duration = :duration, #status = :status",
+            ExpressionAttributeNames={
+                '#end': 'end',
+                '#duration': 'duration',
+                '#status': 'status'
+                },
+            ExpressionAttributeValues={
+                ':end': end,
+                ':duration': duration,
+                ':status': 'COMPLETED'
+                },
         )
 
-    logger.info("Lambda function completed successfully")
+    logger.debug("Lambda function completed successfully")
 
     return {"statusCode": 200, "body": "Session data recorded successfully!"}
 
@@ -59,38 +107,48 @@ def leaderboard(event: dict, context: LambdaContext) -> dict:
     table = dynamodb.Table(os.getenv('SESSIONS_TABLE', 'Sessions'))
 
     try:
-        # Scan DynamoDB table to get all items
-        response = table.scan()
-        items = response.get('Items', [])
+        # List to store the top 10 runs
+        top_runs = list()
+        unique_users = set()
 
-        # Calculate duration for each item
-        results = {}
-        for item in items:
-            email = item.get('email')
-            user_name = item.get('user_name')
-            start = item.get('start')
-            end = item.get('end')
-            if start and end:
-                duration = end - start
-                # Store the shortest duration for each email
-                if email not in results or duration < results[email]:
-                    results[email] = duration
+        # Paginator for handling large result sets
+        paginator = table.meta.client.get_paginator('query')
 
-        # Convert results to list and sort by duration (shortest to longest)
-        sorted_results = sorted(
-            [{'name': email, 'user_name': user_name, 'duration': duration} for email, user_name, duration in results.items()],
-            key=lambda x: x['duration']
-        )
+        # Query parameters
+        query_params = {
+            'TableName': 'Sessions',
+            'IndexName': 'LeaderboardGSI',
+            'KeyConditionExpression': Key('status').eq('COMPLETED'),
+            'ProjectionExpression': '#user_name, #sessionid, #duration',
+            'ExpressionAttributeNames': {"#user_name": "user_name", "#sessionid": "sessionid", "#duration": "duration"},
+            'ScanIndexForward': True  # Ascending order (faster runs first)
+        }
 
-        return {"statusCode": 200, "body": json.dumps(sorted_results)}
+        # Paginate through the results
+        for page in paginator.paginate(**query_params):
+            for item in page['Items']:
+                run = {
+                    'user_name': item['user_name'],
+                    'sessionid': item['sessionid'],
+                    'duration': str(item['duration'])
+                }
+
+                # Add run to the list if it's in the top 10
+                if len(top_runs) < 10 and item['user_name'] not in unique_users:
+                    top_runs.append(run)
+                    unique_users.add(item['user_name'])
+                else:
+                    # If we have 10 runs and the current run is slower than all of them,
+                    # we can stop querying as all subsequent runs will be slower
+                    break
+            else:
+                # This else clause belongs to the for loop, not the if statement
+                # It's executed when the for loop completes normally (i.e., wasn't broken)
+                continue
+            # If we've broken out of the inner loop, break out of the pagination loop too
+            break
+
+        return {"statusCode": 200, "body": json.dumps(top_runs)}
 
     except Exception as e:
         return {"statusCode": 500, 'body': f"Internal server error: {str(e)}"}
-
-
-def parse_datetime(dt_str):
-    """ Parse datetime string with or without milliseconds. """
-    try:
-        return int(datetime.strptime(dt_str, "%Y-%m-%dT%H:%M:%S.%fZ").timestamp())
-    except ValueError:
-        return int(datetime.strptime(dt_str, "%Y-%m-%dT%H:%M:%SZ").timestamp())

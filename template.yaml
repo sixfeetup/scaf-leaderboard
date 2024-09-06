@@ -24,7 +24,7 @@ Resources:
           PASSAGE_APP_ID: dummy
           PASSAGE_API_KEY: dummy
   ReportFunction:
-    Type: 'AWS::Serverless::Function'
+    Type: AWS::Serverless::Function
     Properties:
       Handler: app.report
       Runtime: python3.12
@@ -46,7 +46,7 @@ Resources:
             Path: /report
             Method: post
   LeaderboardFunction:
-    Type: 'AWS::Serverless::Function'
+    Type: AWS::Serverless::Function
     Properties:
       Handler: app.leaderboard
       Runtime: python3.12
@@ -54,8 +54,8 @@ Resources:
       MemorySize: 128
       Timeout: 10
       Policies:
-        - AWSLambdaBasicExecutionRole
-        - AWSLambdaDynamoDBExecutionRole
+        - DynamoDBReadPolicy:
+            TableName: !Ref Sessions
       Environment:
         Variables:
           SESSIONS_TABLE: !Ref Sessions
@@ -66,28 +66,40 @@ Resources:
           Properties:
             Path: /leaderboard
             Method: get
-
   Sessions:
     Type: AWS::DynamoDB::Table
     Properties:
       TableName: Sessions
       AttributeDefinitions:
-        - AttributeName: sessionid
-          AttributeType: S
-        - AttributeName: email
-          AttributeType: S
         - AttributeName: user_name
           AttributeType: S
-        - AttributeName: start
-          AttributeType: N
-        - AttributeName: end
+        - AttributeName: sessionid
+          AttributeType: S
+        - AttributeName: status
+          AttributeType: S
+        - AttributeName: duration
           AttributeType: N
       KeySchema:
-        - AttributeName: sessionid
+        - AttributeName: user_name
           KeyType: HASH
+        - AttributeName: sessionid
+          KeyType: RANGE
+      BillingMode: PROVISIONED
       ProvisionedThroughput:
         ReadCapacityUnits: 5
         WriteCapacityUnits: 5
+      GlobalSecondaryIndexes:
+        - IndexName: LeaderboardGSI
+          KeySchema:
+            - AttributeName: status
+              KeyType: HASH
+            - AttributeName: duration
+              KeyType: RANGE
+          Projection:
+            ProjectionType: ALL
+          ProvisionedThroughput:
+            ReadCapacityUnits: 5
+            WriteCapacityUnits: 5
 
 Parameters:
   DynamoDbEndpoint:

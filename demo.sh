@@ -1,5 +1,7 @@
 #!/bin/bash
 
+sessionid=$(uuidgen)
+
 # Create a temporary Python script
 cat << EOF > temp_server.py
 from http.server import BaseHTTPRequestHandler, HTTPServer
@@ -50,10 +52,13 @@ code_received() {
 trap code_received SIGUSR1
 
 # Start the Python server in the background
-python3 temp_server.py &
+python temp_server.py &
 server_pid=$!
 
 echo "Waiting for code..."
+
+# Example opening of the browser to auth/reg user
+python -c "import webbrowser; webbrowser.open('https://scaf.withpassage.com/authorize?response_type=code&client_id=961JRDH4c4Sin8LYGGbI0Lb7&redirect_uri=http://localhost:51111&scope=openid%20email')"
 
 # Wait for the Python script to exit
 wait $server_pid
@@ -70,9 +75,11 @@ echo "Proceeding with the next steps of the script..."
 # Add your next steps here
 
 # Example: Use the code in a subsequent command
-# curl -v --location --request POST 'https://scaf.withpassage.com/token?grant_type=authorization_code&code=$token&redirect_uri=http%3A%2F%2Flocalhost%3A51111&client_id=961JRDH4c4Sin8LYGGbI0Lb7&client_secret=CHANGEME' \
+# curl -v --location --request POST 'https://scaf.withpassage.com/token?grant_type=authorization_code&code=$code&redirect_uri=http%3A%2F%2Flocalhost%3A51111&client_id=961JRDH4c4Sin8LYGGbI0Lb7&client_secret=CHANGEME' \
 # --header 'Content-Type: application/x-www-form-urlencoded' \
 # --data ''
+
+# write the JWT token and the sessionid to `.scaf-challenge` and into the K8s ConfigMap
 
 # Clean up
 rm code.txt

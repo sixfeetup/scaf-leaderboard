@@ -4,7 +4,6 @@ from decimal import Decimal
 import boto3
 import json
 import os
-from datetime import datetime
 from aws_lambda_powertools import Logger
 from aws_lambda_powertools.utilities.typing import LambdaContext
 from boto3.dynamodb.conditions import Key
@@ -126,15 +125,23 @@ def leaderboard(event: dict, context: LambdaContext) -> dict:
 
         # Paginate through the results
         for page in paginator.paginate(**query_params):
+            logger.debug(f"Got {len(page['Items'])} items in the current page of the paginator")
             for item in page['Items']:
+                logger.debug(f"Current item: {item}")
                 run = {
                     'user_name': item['user_name'],
                     'sessionid': item['sessionid'],
                     'duration': str(item['duration'])
                 }
 
+                # keep going if we already have this user in the list
+                if item['user_name'] in unique_users:
+                    logger.debug(f"Not adding entry for {item['user_name']}, they are already in the list")
+                    continue
+
                 # Add run to the list if it's in the top 10
-                if len(top_runs) < 10 and item['user_name'] not in unique_users:
+                if len(top_runs) < 10:
+                    logger.debug(f"appending current {run}")
                     top_runs.append(run)
                     unique_users.add(item['user_name'])
                 else:
@@ -148,7 +155,15 @@ def leaderboard(event: dict, context: LambdaContext) -> dict:
             # If we've broken out of the inner loop, break out of the pagination loop too
             break
 
-        return {"statusCode": 200, "body": json.dumps(top_runs)}
+        return {
+            "statusCode": 200,
+            "headers": {
+                "Access-Control-Allow-Headers" : "Content-Type",
+                "Access-Control-Allow-Origin": "*",
+                "Access-Control-Allow-Methods": "OPTIONS,POST,GET"
+            },
+            "body": json.dumps(top_runs)
+        }
 
     except Exception as e:
         return {"statusCode": 500, 'body': f"Internal server error: {str(e)}"}

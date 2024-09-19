@@ -23,6 +23,9 @@ def validate_time(timestamp_str):
         # Calculate the difference in seconds
         time_difference = current_time - timestamp
 
+        logger.info(f"current time: {current_time}")
+        logger.info(f"start time: {timestamp}")
+
         # Check if the difference is within 5 minutes (300 seconds)
         return 0 <= time_difference <= 300
     except ValueError:

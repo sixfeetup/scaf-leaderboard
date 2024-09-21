@@ -1,5 +1,7 @@
 import time
+from typing import ClassVar, List
 from decimal import Decimal
+from dataclasses import dataclass, field
 
 import boto3
 import json
@@ -11,25 +13,13 @@ from boto3.dynamodb.conditions import Key
 logger = Logger()
 
 
-def validate_time(timestamp_str):
-    try:
-        # Convert the timestamp string to a float
-        timestamp = float(timestamp_str)
+@dataclass(frozen=True)
+class ActionType:
+    START: ClassVar[str] = "start"
+    END: ClassVar[str] = "end"
 
-        # Get the current time
-        current_time = time.time()
-
-        # Calculate the difference in seconds
-        time_difference = current_time - timestamp
-
-        logger.info(f"current time: {current_time}")
-        logger.info(f"start time: {timestamp}")
-
-        # Check if the difference is within 5 minutes (300 seconds)
-        return 0 <= time_difference <= 300
-    except ValueError:
-        # Return False if the input can't be converted to a float
-        return False
+    # Automatically collect all action types
+    actions: ClassVar[List[str]] = field(default_factory=lambda: [ActionType.START, ActionType.END])
 
 
 def report(event: dict, context: LambdaContext) -> dict:
@@ -38,8 +28,10 @@ def report(event: dict, context: LambdaContext) -> dict:
 
     body = json.loads(event.get('body'))
     sessionid = body.get('sessionid')
-    start = body.get('start')
-    end = body.get('end')
+    action = body.get('action')
+    if action not in ActionType.actions:
+        return {"statusCode": 400, "body": json.dumps({"error": f"Invalid action: {action}"})}
+
     user_email = event.get("requestContext").get("authorizer").get("email")
     user_name = event.get("requestContext").get("authorizer").get("name")
 
@@ -48,9 +40,8 @@ def report(event: dict, context: LambdaContext) -> dict:
     dynamodb = boto3.resource('dynamodb', endpoint_url=endpoint_url)
     table = dynamodb.Table(os.getenv('SESSIONS_TABLE', 'Sessions'))
 
-    if start:
-        if not validate_time(start):
-            return {"statusCode": 500, "body": json.dumps({"error": "Invalid start time"})}
+    if action == ActionType.START:
+        start = time.time()
         table.put_item(
             Item={
                 'user_name': user_name,
@@ -60,10 +51,8 @@ def report(event: dict, context: LambdaContext) -> dict:
                 'status': 'IN_PROGRESS',
             }
         )
-
-    if end:
-        if not validate_time(end):
-            return {"statusCode": 500, "body": json.dumps({"error": "Invalid end time"})}
+    elif action == ActionType.END:
+        end = time.time()
         response = table.get_item(
             Key={
                 'user_name': user_name,
